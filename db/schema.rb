@@ -10,9 +10,28 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_10_101803) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_10_112812) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "bookings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "booked_listing"
+    t.datetime "created_at", null: false
+    t.datetime "from"
+    t.datetime "to"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id"
+  end
+
+  create_table "listings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "location"
+    t.string "name"
+    t.bigint "owner_id"
+    t.jsonb "pictures"
+    t.bigint "price"
+    t.datetime "updated_at", null: false
+  end
 
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
