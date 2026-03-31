@@ -25,39 +25,13 @@ class AuthController < ApplicationController
   end
 
   def logout
-    token = current_jwt_token
-    payload = decode_jwt_payload(token)
+    token = JwtHelper.current_jwt_token
+    payload = JwtHelper.decode_jwt_payload(token)
 
-    revoke_token(payload) if payload.present?
+    JwtHelper.revoke_token(payload) if payload.present?
 
     sign_out(current_user) if current_user
 
     render json: { success: true, message: "Logged out successfully" }
-  end
-
-  private
-
-  def current_jwt_token
-    request.env["warden-jwt_auth.token"] || request.headers["Authorization"]&.split(" ")&.last
-  end
-
-  def decode_jwt_payload(token)
-    return if token.blank?
-
-    Warden::JWTAuth::TokenDecoder.new.call(token)
-  rescue JWT::ExpiredSignature, JWT::DecodeError
-    nil
-  end
-
-  def revoke_token(payload)
-    return if payload.blank?
-
-    jti = payload["jti"]
-    exp = payload["exp"]
-    return if jti.blank?
-
-    JwtDenylist.find_or_create_by!(jti: jti) do |denylist|
-      denylist.exp = Time.zone.at(exp) if exp.present?
-    end
   end
 end
