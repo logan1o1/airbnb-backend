@@ -5,4 +5,6 @@ class User < ApplicationRecord
     validates :first_name, :last_name, :email, :username, presence: true
     validates :email, :username, uniqueness: { case_sensitive: false }
     validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+
+    devise :database_authenticatable, :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 end
