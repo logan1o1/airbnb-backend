@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_31_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,9 +18,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_090000) do
     t.uuid "booked_listing"
     t.datetime "created_at", null: false
     t.datetime "from"
+    t.string "status", default: "pending", null: false
     t.datetime "to"
     t.datetime "updated_at", null: false
     t.bigint "user_id"
+    t.index ["status"], name: "index_bookings_on_status"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -42,6 +44,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_090000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "payments", force: :cascade do |t|
+    t.bigint "amount", null: false
+    t.uuid "booking_id", null: false
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.string "idempotency_key", null: false
+    t.string "razorpay_order_id"
+    t.string "razorpay_payment_id"
+    t.string "razorpay_signature"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["booking_id"], name: "index_payments_on_booking_id"
+    t.index ["idempotency_key"], name: "index_payments_on_idempotency_key", unique: true
+    t.index ["razorpay_payment_id"], name: "index_payments_on_razorpay_payment_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email"
@@ -51,4 +69,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_090000) do
     t.datetime "updated_at", null: false
     t.string "username"
   end
+
+  add_foreign_key "payments", "bookings"
 end

@@ -9,5 +9,11 @@ Rails.application.routes.draw do
   post "auth/login", to: "auth#login"
   post "auth/logout", to: "auth#logout"
 
-  # TODO: add API routes for listings, bookings, etc.
+  # Resources
+  resources :listings, only: %i[index show create]
+  resources :bookings, only: %i[index show create]
+  resources :payments, only: [:create]
+  
+  # Razorpay webhook (no authentication required)
+  post "webhooks/razorpay", to: "payments#verify"
 end
