@@ -3,34 +3,25 @@ class PaymentsController < ApplicationController
   before_action :set_booking, only: [:create]
 
   def create
-    # Generate idempotency key if not provided
     idempotency_key = params[:idempotency_key] || SecureRandom.uuid
     
     # Check for duplicate (idempotency)
     existing_payment = Payment.find_by(idempotency_key: idempotency_key)
-    if existing_payment
-      return render json: {
-        success: true,
-        data: payment_json(existing_payment),
-        message: 'Using existing payment (idempotent)'
-      }
-    end
+    return render json: {
+      success: true,
+      data: payment_json(existing_payment),
+      message: 'Using existing payment (idempotent)'
+    } if existing_payment
 
     # Create payment record
     payment = create_payment_atomically(idempotency_key)
-    
-    if payment.persisted?
-      render json: {
-        success: true,
-        data: payment_json(payment),
-        razorpay_key: ENV['RAZORPAY_KEY_ID']
-      }, status: :created
-    else
-      render json: {
-        success: false,
-        errors: payment.errors.full_messages
-      }, status: :unprocessable_entity
-    end
+    payment.save!
+
+    render json: {
+      success: true,
+      data: payment_json(payment),
+      razorpay_key: ENV['RAZORPAY_KEY_ID']
+    }, status: :created
   rescue => e
     handle_payment_error(e)
   end
@@ -63,7 +54,7 @@ class PaymentsController < ApplicationController
   def set_booking
     @booking = Booking.find(params[:booking_id])
   rescue ActiveRecord::RecordNotFound
-    render json: { success: false, error: 'Booking not found' }, status: :not_found
+    raise ApiError.new("Booking not found", status: :not_found)
   end
 
   def create_payment_atomically(idempotency_key)
@@ -148,15 +139,9 @@ class PaymentsController < ApplicationController
   def handle_payment_error(error)
     case error
     when ActiveRecord::RecordNotUnique
-      render json: {
-        success: false,
-        error: 'Duplicate payment attempt'
-      }, status: :conflict
+      raise ApiError.new("Duplicate payment attempt", status: :conflict)
     else
-      render json: {
-        success: false,
-        error: error.message
-      }, status: :unprocessable_entity
+      raise ApiError.new(error.message, status: :unprocessable_entity)
     end
   end
 

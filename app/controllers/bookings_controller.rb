@@ -1,5 +1,5 @@
 class BookingsController < ApplicationController
-  before_action :set_booking, only: [:show]
+  before_action :set_booking, only: [ :show ]
 
   def index
     bookings = current_user.bookings
@@ -18,25 +18,17 @@ class BookingsController < ApplicationController
   end
 
   def create
-    # Create booking and initiate payment
     result = create_booking_and_payment
-    
-    if result[:booking].persisted? && result[:payment].persisted?
-      render json: {
-        success: true,
-        data: {
-          booking: booking_json(result[:booking]),
-          payment: payment_json(result[:payment]),
-          razorpay_key: ENV['RAZORPAY_KEY_ID']
-        },
-        message: "Booking created. Complete payment to confirm."
-      }, status: :created
-    else
-      render json: {
-        success: false,
-        errors: result[:booking].errors.full_messages + result[:payment].errors.full_messages
-      }, status: :unprocessable_entity
-    end
+
+    render json: {
+      success: true,
+      data: {
+        booking: booking_json(result[:booking]),
+        payment: payment_json(result[:payment]),
+        razorpay_key: ENV["RAZORPAY_KEY_ID"]
+      },
+      message: "Booking created. Complete payment to confirm."
+    }, status: :created
   rescue => e
     handle_booking_error(e)
   end
@@ -44,37 +36,39 @@ class BookingsController < ApplicationController
   private
 
   def create_booking_and_payment
+    booked_listing = params.require(:booked_listing)
+    from = params.require(:from)
+    to = params.require(:to)
+    idempotency_key = params[:idempotency_key] || SecureRandom.uuid
+
     ActiveRecord::Base.transaction(isolation: :serializable) do
-      # Lock listing to serialize concurrent attempts
-      _listing = Listing.lock.find(booking_params[:booked_listing])
-      
-      # Create booking with 'pending' status
-      booking = current_user.bookings.build(booking_params)
-      booking.status = 'pending'
+      _listing = Listing.lock.find(booked_listing)
+
+      booking = current_user.bookings.build(booked_listing: booked_listing, from: from, to: to)
+      booking.status = "pending"
       booking.save!
-      
-      # Create payment record
-      idempotency_key = params[:idempotency_key] || SecureRandom.uuid
+
       razorpay_order = create_razorpay_order(booking)
-      
-      payment = booking.create_payment!(
+
+      payment = Payment.create!(
+        booking_id: booking.id,
         amount: booking.listing.price,
-        razorpay_order_id: razorpay_order['id'],
+        razorpay_order_id: razorpay_order["id"],
         idempotency_key: idempotency_key,
-        status: 'pending'
+        status: "pending"
       )
-      
+
       { booking: booking, payment: payment }
     end
   end
 
   def create_razorpay_order(booking)
     Razorpay::Client.new(
-      key_id: ENV['RAZORPAY_KEY_ID'],
-      key_secret: ENV['RAZORPAY_KEY_SECRET']
+      key_id: ENV["RAZORPAY_KEY_ID"],
+      key_secret: ENV["RAZORPAY_KEY_SECRET"]
     ).order.create(
       amount: booking.listing.price,
-      currency: 'INR',
+      currency: "INR",
       receipt: booking.id.to_s,
       notes: {
         booking_id: booking.id,
@@ -83,53 +77,25 @@ class BookingsController < ApplicationController
     )
   end
 
-  def create_booking_atomically
-    ActiveRecord::Base.transaction(isolation: :serializable) do
-      # Lock listing to serialize concurrent attempts for this listing
-      _listing = Listing.lock.find(booking_params[:booked_listing])
-      
-      # Build booking with confirmed status
-      booking = current_user.bookings.build(booking_params)
-      booking.status = 'confirmed'
-      
-      # Save - either succeeds or fails at DB constraint level
-      booking.save!
-      booking
-    end
-  end
-
   def handle_booking_error(error)
     case error
-    when ActiveRecord::RecordNotUnique, PG::ExclusionViolation
-      # Exclusion constraint violation: overlapping booking exists
-      render json: {
-        success: false,
-        error: 'These dates are no longer available. Another booking was just confirmed for this period.'
-      }, status: :conflict
+    when ActiveRecord::RecordNotUnique
+      raise ApiError.new("These dates are no longer available. Another booking was just confirmed for this period.", status: :conflict)
     when ActiveRecord::SerializationFailure
-      # Serialization conflict (rare, but can happen under extreme load)
-      render json: {
-        success: false,
-        error: 'Booking temporarily unavailable. Please try again.'
-      }, status: :service_unavailable
+      raise ApiError.new("Booking temporarily unavailable. Please try again.", status: :service_unavailable)
     else
-      render json: {
-        success: false,
-        error: error.message
-      }, status: :unprocessable_entity
+      raise ApiError.new(error.message, status: :unprocessable_entity)
     end
   end
 
   def set_booking
     @booking = Booking.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { success: false, error: 'Booking not found' }, status: :not_found
+    raise ApiError.new("Booking not found", status: :not_found)
   end
 
   def authorize_booking_owner!
-    return if @booking.user_id == current_user.id
-
-    render json: { success: false, error: 'Unauthorized' }, status: :forbidden
+    raise ApiError.new("Unauthorized", status: :forbidden) unless @booking.user_id == current_user.id
   end
 
   def booking_params

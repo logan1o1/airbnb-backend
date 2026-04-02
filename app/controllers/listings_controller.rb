@@ -19,19 +19,18 @@ class ListingsController < ApplicationController
   end
 
   def create
-    listing = current_user.owned_listings.build(listing_params)
+    name = params.require(:name)
+    location = params.require(:location)
+    price = params.require(:price)
+    pictures = params[:pictures]
 
-    if listing.save
-      render json: {
-        success: true,
-        data: listing_json(listing)
-      }, status: :created
-    else
-      render json: {
-        success: false,
-        errors: listing.errors.full_messages
-      }, status: :unprocessable_entity
-    end
+    listing = current_user.owned_listings.build(name: name, location: location, price: price, pictures: pictures)
+    listing.save!
+
+    render json: {
+      success: true,
+      data: listing_json(listing)
+    }, status: :created
   end
 
   private
@@ -39,7 +38,7 @@ class ListingsController < ApplicationController
   def set_listing
     @listing = Listing.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { success: false, error: 'Listing not found' }, status: :not_found
+    raise ApiError.new("Listing not found", status: :not_found)
   end
 
   def listing_params

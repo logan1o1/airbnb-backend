@@ -6,6 +6,7 @@ Rails.application.routes.draw do
   devise_for :users, skip: %i[sessions registrations passwords confirmations unlocks]
 
   # Authentication endpoints for JWT
+  post "auth/signup", to: "auth#signup"
   post "auth/login", to: "auth#login"
   post "auth/logout", to: "auth#logout"
 
