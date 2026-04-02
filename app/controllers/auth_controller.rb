@@ -1,27 +1,50 @@
 class AuthController < ApplicationController
-  skip_before_action :authenticate_user!, only: [ :login ]
+  skip_before_action :authenticate_user!, only: [ :login, :signup ]
+
+  def signup
+    username = params.require(:username)
+    first_name = params.require(:first_name)
+    last_name = params.require(:last_name)
+    email = params.require(:email)
+    password = params.require(:password)
+
+    user = User.new(username: username, first_name: first_name, last_name: last_name, email: email, password: password)
+    user.save!
+
+    token, = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)
+
+    render json: {
+      success: true,
+      token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name
+      }
+    }, status: :created
+  end
 
   def login
-    user = User.find_by(email: params[:email])
+    email = params.require(:email)
+    password = params.require(:password)
 
-    if user&.valid_password?(params[:password])
-      token, = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)
+    user = User.find_by(email: email)
 
-      render json: {
-        success: true,
-        token: token,
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username
-        }
+    raise ApiError.new("Invalid email or password", status: :unauthorized) unless user&.valid_password?(password)
+
+    token, = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)
+
+    render json: {
+      success: true,
+      token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username
       }
-    else
-      render json: {
-        success: false,
-        error: "Invalid email or password"
-      }, status: :unauthorized
-    end
+    }
   end
 
   def logout

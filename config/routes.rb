@@ -6,8 +6,15 @@ Rails.application.routes.draw do
   devise_for :users, skip: %i[sessions registrations passwords confirmations unlocks]
 
   # Authentication endpoints for JWT
+  post "auth/signup", to: "auth#signup"
   post "auth/login", to: "auth#login"
   post "auth/logout", to: "auth#logout"
 
-  # TODO: add API routes for listings, bookings, etc.
+  # Resources
+  resources :listings, only: %i[index show create]
+  resources :bookings, only: %i[index show create]
+  resources :payments, only: [:create]
+  
+  # Razorpay webhook (no authentication required)
+  post "webhooks/razorpay", to: "payments#verify"
 end
