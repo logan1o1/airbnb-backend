@@ -48,8 +48,10 @@ class AuthController < ApplicationController
   end
 
   def logout
-    token = JwtHelper.current_jwt_token
-    payload = JwtHelper.decode_jwt_payload(token)
+    auth_header = request.headers["Authorization"].to_s
+    token = auth_header.split(" ").last if auth_header.present?
+
+    payload = JwtHelper.decode_jwt_payload(token) if token.present?
 
     JwtHelper.revoke_token(payload) if payload.present?
 

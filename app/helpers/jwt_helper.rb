@@ -1,4 +1,6 @@
 module JwtHelper
+  extend self
+
   def current_jwt_token
     auth = request.headers["Authorization"].to_s
     scheme, token = auth.split(" ")

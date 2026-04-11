@@ -18,16 +18,18 @@ class BookingsController < ApplicationController
   end
 
   def create
-    result = create_booking_and_payment
+    booked_listing = params.require(:booked_listing)
+    from = params.require(:from)
+    to = params.require(:to)
+
+    booking = create_booking_atomically(booked_listing, from, to)
 
     render json: {
       success: true,
       data: {
-        booking: booking_json(result[:booking]),
-        payment: payment_json(result[:payment]),
-        razorpay_key: ENV["RAZORPAY_KEY_ID"]
+        booking: booking_json(booking)
       },
-      message: "Booking created. Complete payment to confirm."
+      message: "Booking created successfully. Use the booking ID to initiate payment."
     }, status: :created
   rescue => e
     handle_booking_error(e)
@@ -35,46 +37,20 @@ class BookingsController < ApplicationController
 
   private
 
-  def create_booking_and_payment
-    booked_listing = params.require(:booked_listing)
-    from = params.require(:from)
-    to = params.require(:to)
-    idempotency_key = params[:idempotency_key] || SecureRandom.uuid
-
+  def create_booking_atomically(booked_listing, from, to)
     ActiveRecord::Base.transaction(isolation: :serializable) do
       _listing = Listing.lock.find(booked_listing)
 
-      booking = current_user.bookings.build(booked_listing: booked_listing, from: from, to: to)
+      booking = current_user.bookings.build(
+        booked_listing: booked_listing,
+        from: from,
+        to: to
+      )
       booking.status = "pending"
       booking.save!
 
-      razorpay_order = create_razorpay_order(booking)
-
-      payment = Payment.create!(
-        booking_id: booking.id,
-        amount: booking.listing.price,
-        razorpay_order_id: razorpay_order["id"],
-        idempotency_key: idempotency_key,
-        status: "pending"
-      )
-
-      { booking: booking, payment: payment }
+      booking
     end
-  end
-
-  def create_razorpay_order(booking)
-    Razorpay::Client.new(
-      key_id: ENV["RAZORPAY_KEY_ID"],
-      key_secret: ENV["RAZORPAY_KEY_SECRET"]
-    ).order.create(
-      amount: booking.listing.price,
-      currency: "INR",
-      receipt: booking.id.to_s,
-      notes: {
-        booking_id: booking.id,
-        listing_name: booking.listing.name
-      }
-    )
   end
 
   def handle_booking_error(error)
@@ -111,16 +87,6 @@ class BookingsController < ApplicationController
       to: booking.to,
       status: booking.status,
       created_at: booking.created_at
-    }
-  end
-
-  def payment_json(payment)
-    {
-      id: payment.id,
-      booking_id: payment.booking_id,
-      amount: payment.amount,
-      razorpay_order_id: payment.razorpay_order_id,
-      status: payment.status
     }
   end
 end

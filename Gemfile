@@ -28,6 +28,10 @@ gem "razorpay"
 
 gem "dotenv-rails"
 
+gem "cloudinary"
+
+gem "concurrent-ruby", "~> 1.3", ">= 1.3.6", require: "concurrent"
+
 gem "rack-cors"
 gem "rack-attack"
 

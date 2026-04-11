@@ -53,12 +53,12 @@ class Rack::Attack
     end
   end
 
-  self.throttled_response = lambda do |env|
+  self.throttled_responder = lambda do |env|
     retry_after = (env["RateLimit-Reset"] || Time.now.to_i + 60).to_s
     [
       429,
       { "Content-Type" => "application/json", "Retry-After" => retry_after },
-      [{ error: "Too many requests. Please try again later." }.to_json]
+      [ { error: "Too many requests. Please try again later." }.to_json ]
     ]
   end
 end

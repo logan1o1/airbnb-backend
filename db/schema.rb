@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_10_144545) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -22,7 +22,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
     t.datetime "to"
     t.datetime "updated_at", null: false
     t.bigint "user_id"
+    t.index ["booked_listing"], name: "index_bookings_on_booked_listing"
     t.index ["status"], name: "index_bookings_on_status"
+    t.index ["user_id"], name: "index_bookings_on_user_id"
   end
 
   create_table "jwt_denylists", force: :cascade do |t|
@@ -35,6 +37,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
   end
 
   create_table "listings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "amenties"
     t.datetime "created_at", null: false
     t.string "location"
     t.string "name"
@@ -42,6 +45,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
     t.jsonb "pictures"
     t.bigint "price"
     t.datetime "updated_at", null: false
+    t.index ["owner_id"], name: "index_listings_on_owner_id"
   end
 
   create_table "payments", force: :cascade do |t|
@@ -53,6 +57,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
     t.string "razorpay_order_id"
     t.string "razorpay_payment_id"
     t.string "razorpay_signature"
+    t.string "short_url"
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["booking_id"], name: "index_payments_on_booking_id"
@@ -70,5 +75,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_01_104815) do
     t.string "username"
   end
 
+  add_foreign_key "bookings", "listings", column: "booked_listing", on_delete: :cascade
+  add_foreign_key "bookings", "users", on_delete: :cascade
+  add_foreign_key "listings", "users", column: "owner_id", on_delete: :cascade
   add_foreign_key "payments", "bookings"
 end
