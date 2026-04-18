@@ -16,7 +16,11 @@ Rails.application.routes.draw do
       get :my_listings
     end
   end
-  resources :bookings, only: %i[index show create]
+  resources :bookings, only: %i[index show create] do
+  member do
+    patch :cancel_booking
+  end
+end
   resources :payments, only: [ :create ]
 
   # Razorpay webhook (no authentication required)
