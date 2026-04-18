@@ -1,5 +1,5 @@
 class BookingsController < ApplicationController
-  before_action :set_booking, only: [ :show ]
+  before_action :set_booking, only: [ :show, :cancel_booking ]
 
   def index
     bookings = current_user.bookings
@@ -33,6 +33,25 @@ class BookingsController < ApplicationController
     }, status: :created
   rescue => e
     handle_booking_error(e)
+  end
+
+  def cancel_booking
+    authorize_booking_owner!
+
+    unless @booking.status.in?([ "pending", "failed" ])
+      return render json: {
+        success: false,
+        error: "Cannot cancel a confirmed booking"
+      }, status: :unprocessable_entity
+    end
+
+    @booking.update!(status: "cancelled")
+
+    render json: {
+      success: true,
+      data: booking_json(@booking),
+      message: "Booking cancelled successfully"
+    }
   end
 
   private

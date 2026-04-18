@@ -33,7 +33,10 @@ module ImageUploader
       folder: "airbnb-listings",
       use_filename: true,
       unique_filename: true,
-      resource_type: "auto"
+      resource_type: "auto",
+      eager: [
+        { width: 800, crop: "scale", quality: "auto", fetch_format: "auto" }
+      ]
     })
     result["secure_url"]
   end

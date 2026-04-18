@@ -4,13 +4,13 @@ class Booking < ApplicationRecord
   has_one :payment, foreign_key: :booking_id, inverse_of: :booking, dependent: :destroy
 
   validates :from, :to, presence: true
-  validates :status, presence: true, inclusion: { in: %w[pending confirmed failed] }
+  validates :status, presence: true, inclusion: { in: %w[pending confirmed failed cancelled] }
   validate :to_after_from
 
-  enum :status, { pending: 'pending', confirmed: 'confirmed', failed: 'failed' }, prefix: true
+  enum :status, { pending: "pending", confirmed: "confirmed", failed: "failed", cancelled: "cancelled" }, prefix: true
 
-  scope :confirmed, -> { where(status: 'confirmed') }
-  scope :pending, -> { where(status: 'pending') }
+  scope :confirmed, -> { where(status: "confirmed") }
+  scope :pending, -> { where(status: "pending") }
 
   def overlaps_with_confirmed_bookings?
     Booking.confirmed
