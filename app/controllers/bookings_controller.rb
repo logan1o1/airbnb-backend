@@ -1,16 +1,20 @@
 class BookingsController < ApplicationController
   before_action :set_booking, only: [ :show, :cancel_booking ]
+  before_action :authorize_booking_owner, only: [ :show, :cancel_booking  ]
 
   def index
-    bookings = current_user.bookings
+    bookings = Rails.cache.fetch("bookings_index_#{current_user.id}", expires_in: 10.minutes) do
+      Rails.logger.info("It was not a cache hit in bookings index")
+      current_user.bookings
+    end
+
     render json: {
       success: true,
-      data: bookings.map { |booking| booking_json(booking) }
+      data: bookings
     }
   end
 
   def show
-    authorize_booking_owner!
     render json: {
       success: true,
       data: booking_json(@booking)
@@ -36,8 +40,6 @@ class BookingsController < ApplicationController
   end
 
   def cancel_booking
-    authorize_booking_owner!
-
     unless @booking.status.in?([ "pending", "failed" ])
       return render json: {
         success: false,
@@ -84,12 +86,13 @@ class BookingsController < ApplicationController
   end
 
   def set_booking
-    @booking = Booking.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    raise ApiError.new("Booking not found", status: :not_found)
+    booking_id = params.require(:id)
+    @booking = Rails.cache.fetch("bookings_show_#{booking_id}", expires_in: 30.minutes) do
+      Booking.find_by!(id: booking_id)
+    end
   end
 
-  def authorize_booking_owner!
+  def authorize_booking_owner
     raise ApiError.new("Unauthorized", status: :forbidden) unless @booking.user_id == current_user.id
   end
 

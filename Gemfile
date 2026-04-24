@@ -32,6 +32,8 @@ gem "cloudinary"
 
 gem "concurrent-ruby", "~> 1.3", ">= 1.3.6", require: "concurrent"
 
+gem "redis", "~> 5.4", ">= 5.4.1"
+
 gem "rack-cors"
 gem "rack-attack"
 
