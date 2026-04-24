@@ -3,10 +3,14 @@ class ListingsController < ApplicationController
   before_action :authorize_listing, only: [ :update, :destroy ]
 
   def index
-    listings = Listing.where.not(owner_id: current_user.id)
+    listings = Rails.cache.fetch("listings_index_#{current_user.id}", expires_in: 10.minutes) do
+      Rails.logger.info("It was not a cache hit in listing index")
+      Listing.where.not(owner_id: current_user.id).to_a
+    end
+
     render json: {
       success: true,
-      data: listings.map { |listing| listing_json(listing) }
+      data: listings
     }
   end
 
@@ -17,12 +21,26 @@ class ListingsController < ApplicationController
     }
   end
 
-  def my_listings
-    listings = Listing.where(owner_id: current_user.id)
+  def create
+    name = params.require(:name)
+    location = params.require(:location)
+    price = params.require(:price)
+    pictures = params[:pictures]
+
+    picture_urls = pictures.present? ? ImageUploader.upload_multiple_images(pictures) : []
+
+    listing = current_user.owned_listings.build(
+      name: name,
+      location: location,
+      price: price,
+      pictures: picture_urls
+    )
+    listing.save!
+
     render json: {
       success: true,
-      data: listings.map { |listing| listing_json(listing) }
-    }
+      data: listing_json(listing)
+    }, status: :created
   end
 
   def update
@@ -49,6 +67,18 @@ class ListingsController < ApplicationController
     }
   end
 
+
+  def my_listings
+    listings = Rails.cache.fetch("listing_self_#{current_user.id}", expire_in: 20.minutes) do
+      Listing.where(owner_id: current_user.id).to_a
+    end
+
+    render json: {
+      success: true,
+      data: listings
+    }
+  end
+
   def destroy
     @listing.destroy!
     render json: {
@@ -57,34 +87,13 @@ class ListingsController < ApplicationController
     }
   end
 
-  def create
-    name = params.require(:name)
-    location = params.require(:location)
-    price = params.require(:price)
-    pictures = params[:pictures]
-
-    picture_urls = pictures.present? ? ImageUploader.upload_multiple_images(pictures) : []
-
-    listing = current_user.owned_listings.build(
-      name: name,
-      location: location,
-      price: price,
-      pictures: picture_urls
-    )
-    listing.save!
-
-    render json: {
-      success: true,
-      data: listing_json(listing)
-    }, status: :created
-  end
-
   private
 
   def set_listing
-    @listing = Listing.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    raise ApiError.new("Listing not found", status: :not_found)
+    listing_id = params.require(:id)
+    @listing = Rails.cache.fetch("listings_show_#{listing_id}", expires_in: 30.minutes) do
+      Listing.find_by!(id: listing_id)
+    end
   end
 
   def authorize_listing
